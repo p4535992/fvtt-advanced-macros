@@ -19,9 +19,9 @@
 			},
 			"runAsGM": "Execute Macro As GM ?",
 			"runAsGMTooltip": "This will cause the macro to be executed by the GM user when players execute it. \nFor security reasons, only applies to GM-created macros with no other owners.",
-            "runForEveryone": "Execute Macro for everyone ?",
+			"runForEveryone": "Execute Macro for everyone ?",
 			"runForEveryoneTooltip": "This will cause the macro to be executed by the GM user for every players connected. \nFor security reasons, only applies to GM-created macros with no other owners.",
-            "runForSpecificUser": "Execute Macro for specific user ?",
+			"runForSpecificUser": "Execute Macro for specific user ?",
 			"runForSpecificUserTooltip": "This will cause the macro to be executed by the GM user for a specific player connected. \nFor security reasons, only applies to GM-created macros with no other owners.",
 			"highlight": {
 				"name": "Highlight Macro Codes",
