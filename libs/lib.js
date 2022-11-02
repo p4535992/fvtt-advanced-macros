@@ -65,3 +65,44 @@ export function dialogWarning(message, icon = "fas fa-exclamation-triangle") {
     </p>`;
 }
 // =========================================================================================
+
+export function getTemplateContext(args = null, remoteContext = null) {
+    const context = {
+        game: game,
+        ui: ui,
+        canvas: canvas,
+        scene: canvas.scene,
+        args,
+        speaker: {},
+        actor: null,
+        token: null,
+        character: null,
+    };
+    if (remoteContext) {
+        // Set the context based on the remote context, and make sure data is valid and the remote
+        // has a token/actor selected.
+        context.speaker = remoteContext.speaker || {};
+        if (remoteContext.actorId) context.actor = game.actors.get(remoteContext.actorId) || null;
+        if (remoteContext.sceneId) context.scene = game.scenes.get(remoteContext.sceneId) || canvas.scene;
+        if (remoteContext.tokenId) {
+            if (canvas.scene.id === context.scene.id) {
+                context.token = canvas.tokens.get(remoteContext.tokenId) || null;
+            } else {
+                const tokenData = context.scene.getEmbeddedEntity("Token", remoteContext.tokenId);
+                if (tokenData) context.token = new Token(tokenData, context.scene);
+            }
+        }
+        if (remoteContext.characterId) context.character = game.actors.get(remoteContext.characterId) || null;
+    } else {
+        context.speaker = ChatMessage.getSpeaker();
+        if (args && Object.prototype.toString.call(args[0]) === "[object Object") {
+            context.actor = args[0].data.root.actor;
+            context.token = args[0].data.root.token;
+        } else {
+            context.actor = game.actors.get(context.speaker.actor);
+            if (canvas.scene) context.token = canvas.tokens?.get(context.speaker.token);
+        }
+        context.character = game.user.character;
+    }
+    return context;
+}
