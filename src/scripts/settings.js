@@ -1,5 +1,4 @@
 import CONSTANTS from "./constants.js";
-import "./lib/lib.js";
 export const registerSettings = function () {
 	game.settings.registerMenu(CONSTANTS.MODULE_NAME, "resetAllSettings", {
 		name: `${CONSTANTS.MODULE_NAME}.setting.reset.name`,
@@ -21,7 +20,7 @@ export const registerSettings = function () {
 	});
 	const settings = defaultSettings();
 	for (const [settingName, settingValue] of Object.entries(settings)) {
-		game.settings.register(CONSTANTS.MODULE_NAME, name, settingValue);
+		game.settings.register(CONSTANTS.MODULE_NAME, settingName, settingValue);
 	}
 	// for (const [settingName, settingValue] of Object.entries(otherSettings)) {
 	//     game.settings.register(CONSTANTS.MODULE_NAME, settingName, settingValue);

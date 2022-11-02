@@ -1,8 +1,6 @@
 import { setApi } from "../main.js";
-import "./api.js";
 import API from "./api.js";
 import CONSTANTS from "./constants.js";
-import { renderDialogFinalBlow } from "./lib/lib.js";
 import { advancedMacroSocket, registerSocket } from "./socket.js";
 
 export const initHooks = () => {
@@ -23,40 +21,41 @@ export const initHooks = () => {
 
 	Hooks.on("chatMessage", API.chatMessage);
 
-	libWrapper.register(
-		"advanced-macros",
-		"Macro.prototype.renderContent",
-		async function (wrapped, ...args) {
-			const context = API.getTemplateContext(args);
-			if (this.type === "chat") {
-				if (this.command.includes("{{")) {
-					const compiled = Handlebars.compile(this.command);
-					return compiled(context, {
-						allowProtoMethodsByDefault: true,
-						allowProtoPropertiesByDefault: true,
-					});
-				} else {
-					return this.command;
-				}
-			}
-			if (this.type === "script") {
-				if (!game.user.can("MACRO_SCRIPT")) {
-					return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
-				}
-				if (this.getFlag("advanced-macros", "runAsGM") && API.canRunAsGM(this) && !game.user.isGM) {
-					if (this.getFlag("advanced-macros", "runForEveryone")) {
-						return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
-					}
-					return await advancedMacroSocket.executeAsGM(this, context);
-				} else if (this.getFlag("advanced-macros", "runForEveryone") && API.canRunAsGM(this) && !game.user.isGM) {
-					return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
-				}
-				// return this.callScriptFunction(context);
-				return this._executeScript(context);
-			}
-		},
-		"OVERRIDE"
-	);
+	Macro.prototype.renderContent = API.renderMacroOLD;
+	// libWrapper.register(
+	// 	"advanced-macros",
+	// 	"Macro.prototype.renderContent",
+	// 	async function (wrapped, ...args) {
+	// 		const context = API.getTemplateContext(args);
+	// 		if (this.type === "chat") {
+	// 			if (this.command.includes("{{")) {
+	// 				const compiled = Handlebars.compile(this.command);
+	// 				return compiled(context, {
+	// 					allowProtoMethodsByDefault: true,
+	// 					allowProtoPropertiesByDefault: true,
+	// 				});
+	// 			} else {
+	// 				return this.command;
+	// 			}
+	// 		}
+	// 		if (this.type === "script") {
+	// 			if (!game.user.can("MACRO_SCRIPT")) {
+	// 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
+	// 			}
+	// 			if (this.getFlag("advanced-macros", "runAsGM") && API.canRunAsGM(this) && !game.user.isGM) {
+	// 				if (this.getFlag("advanced-macros", "runForEveryone")) {
+	// 					return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
+	// 				}
+	// 				return await advancedMacroSocket.executeAsGM(this, context);
+	// 			} else if (this.getFlag("advanced-macros", "runForEveryone") && API.canRunAsGM(this) && !game.user.isGM) {
+	// 				return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
+	// 			}
+	// 			// return this.callScriptFunction(context);
+	// 			return this._executeScript(context);
+	// 		}
+	// 	},
+	// 	"OVERRIDE"
+	// );
 
 	libWrapper.register(
 		"advanced-macros",

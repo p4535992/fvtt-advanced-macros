@@ -1,4 +1,4 @@
-import { libWrapper } from "./module/shim.js";
+// import { libWrapper } from "./module/shim.js";
 
 class FurnaceMacros {
 	constructor() {

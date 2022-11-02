@@ -1,5 +1,5 @@
-import { error } from "console";
-import { advancedMacroSocket } from "./socket";
+import { error } from "./lib/lib.js";
+import { advancedMacroSocket } from "./socket.js";
 
 const API = {
 	// async GMElectionIDArr(...inAttributes) {
@@ -151,6 +151,28 @@ const API = {
 			}
 		});
 		return author && author.isGM && Object.values(permissions).every((p) => p < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
+	},
+
+	renderMacroOLD(...args) {
+		const context = this.getTemplateContext(args);
+		if (this.type === "chat") {
+			if (this.command.includes("{{")) {
+				const compiled = Handlebars.compile(this.command);
+				return compiled(context, { allowProtoMethodsByDefault: true, allowProtoPropertiesByDefault: true });
+			} else {
+				return this.command;
+			}
+		}
+		if (this.type === "script") {
+			if (!game.user.can("MACRO_SCRIPT")) {
+				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
+			}
+			if (this.getFlag("advanced-macros", "runAsGM") && canRunAsGM(this) && !game.user.isGM) {
+				return game.furnaceMacros.executeMacroAsGM(this, context);
+			}
+			// return this.callScriptFunction(context);
+			return this._executeScript(context);
+		}
 	},
 
 	async renderMacro(wrapped, ...args) {

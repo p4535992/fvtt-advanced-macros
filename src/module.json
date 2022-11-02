@@ -4,7 +4,7 @@
 	"description": "Use handlebars templating, recursive macro calls and call macros with arguments or directly from chat.",
 	"url": "https://github.com/p4535992/fvtt-advanced-macros",
 	"version": "1.18.0",
-	"scripts": ["libs/tokenizer.min.js"],
+	"scripts": ["lib/tokenizer.min.js"],
 	"esmodules": ["main.js"],
 	"languages": [
 		{
