@@ -377,7 +377,7 @@ class FurnaceMacros {
 			const canRunAsGM = obj.object.canRunAsGM;
 			const typeGroup = form.find("select[name=type]").parent(".form-group");
 			const gmDiv = $(`
-				<div class="form-group" title="${game.i18n.localize("FURNACE.MACROS.runAsGMTooltip")}"> 
+				<div class="form-group" title="${game.i18n.localize("FURNACE.MACROS.runAsGMTooltip")}">
 					<label class="form-group">
 						<span>${game.i18n.localize("FURNACE.MACROS.runAsGM")}</span>
 						<input type="checkbox" name="flags.advanced-macros.runAsGM" data-dtype="Boolean" ${runAsGM ? "checked" : ""} ${!canRunAsGM ? "disabled" : ""}/>
