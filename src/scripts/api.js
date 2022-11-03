@@ -32,7 +32,7 @@ const API = {
 
 	async executeMacroArr(...inAttributes) {
 		if (!Array.isArray(inAttributes)) {
-			throw error("GMExecuteMacro | inAttributes must be of type array");
+			throw error("executeMacroArr | inAttributes must be of type array");
 		}
 		const [macroId, userId, args, context] = inAttributes;
 		return await this.executeMacro(macroId, userId, args, context);
@@ -54,7 +54,10 @@ const API = {
 		if (!user.can("MACRO_SCRIPT")) {
 			throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"), true);
 		}
-		if (!macro.getFlag("advanced-macros", "runAsGM") || !this.canRunAsGM(macro)) {
+		// if (!macro.getFlag("advanced-macros", "runAsGM") || !this.canRunAsGM(macro)) {
+		// 	throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"), true);
+		// }
+		if (!this.canRunAsGM(macro)) {
 			throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"), true);
 		}
 
@@ -130,7 +133,9 @@ const API = {
 				context.token = args[0].data.root.token;
 			} else {
 				context.actor = game.actors.get(context.speaker.actor);
-				if (canvas.scene) context.token = canvas.tokens?.get(context.speaker.token);
+				if (canvas.scene) {
+					context.token = canvas.tokens?.get(context.speaker.token);
+				}
 			}
 			context.character = game.user.character;
 		}
@@ -153,7 +158,7 @@ const API = {
 		return author && author.isGM && Object.values(permissions).every((p) => p < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
 	},
 
-	renderMacroOLD(...args) {
+	async renderMacroOLD(...args) {
 		const context = this.getTemplateContext(args);
 		if (this.type === "chat") {
 			if (this.command.includes("{{")) {
@@ -168,7 +173,7 @@ const API = {
 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 			}
 			if (this.getFlag("advanced-macros", "runAsGM") && canRunAsGM(this) && !game.user.isGM) {
-				return game.furnaceMacros.executeMacroAsGM(this, context);
+				return await advancedMacroSocket.executeMacroAsGM("executeMacro", this.id, game.user.id, undefined, context);
 			}
 			// return this.callScriptFunction(context);
 			return this._executeScript(context);
@@ -190,7 +195,6 @@ const API = {
 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 			}
 			if (this.getFlag("advanced-macros", "runAsGM") && this.canRunAsGM() && !game.user.isGM) {
-				// return game.furnaceMacros.executeMacroAsGM(this, context);
 				return await advancedMacroSocket.executeMacroAsGM("executeMacro", this.id, game.user.id, undefined, context);
 			}
 			// return this.callScriptFunction(context);

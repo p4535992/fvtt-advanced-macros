@@ -3,13 +3,17 @@ import API from "./api.js";
 import CONSTANTS from "./constants.js";
 import { advancedMacroSocket, registerSocket } from "./socket.js";
 
-export const initHooks = () => {
+export const initHooks = async () => {
 	let helpers = {
 		macro: (name, ...args) => {
 			const macro = game.macros.contents.find((macro) => macro.name === name);
-			if (!macro) return "";
+			if (!macro) {
+				return "";
+			}
 			const result = macro.renderContent(...args);
-			if (typeof result !== "string") return "";
+			if (typeof result !== "string") {
+				return "";
+			}
 			return result;
 		},
 	};
@@ -21,7 +25,8 @@ export const initHooks = () => {
 
 	Hooks.on("chatMessage", API.chatMessage);
 
-	Macro.prototype.renderContent = API.renderMacroOLD;
+	// Macro.prototype.renderContent = await API.renderMacroOLD;
+
 	// libWrapper.register(
 	// 	"advanced-macros",
 	// 	"Macro.prototype.renderContent",
@@ -84,7 +89,16 @@ export const initHooks = () => {
 		"OVERRIDE"
 	);
 
-	libWrapper.register("advanced-macros", "Macro.prototype.execute", API.executeMacro, "OVERRIDE");
+	libWrapper.register(
+		"advanced-macros",
+		"Macro.prototype.execute",
+		async function (wrapped, ...args) {
+			const macro = this;
+			return await API.executeMacro(macro.id, game.user.id, undefined, undefined);
+		},
+		"OVERRIDE"
+	);
+
 	if (game.system.id === "pf2e") {
 		libWrapper.register(
 			"advanced-macros",
