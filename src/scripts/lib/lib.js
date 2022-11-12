@@ -366,10 +366,15 @@ export function chatMessage(chatLog, message, chatData) {
 	let tokenizer = null;
 	let hasMacros = false;
 	if (message.includes("{{")) {
-		const context = FurnaceMacros.getTemplateContext();
+		const context = getTemplateContext();
 		const compiled = Handlebars.compile(message);
-		message = compiled(context, { allowProtoMethodsByDefault: true, allowProtoPropertiesByDefault: true });
-		if (message.trim().length === 0) return false;
+		message = compiled(context, { 
+			allowProtoMethodsByDefault: true, 
+			allowProtoPropertiesByDefault: true 
+		});
+		if (message.trim().length === 0) {
+			return false;
+		}
 		message = message;
 	}
 	if (message.trim().startsWith("<") || message.match(chatLog.constructor.MESSAGE_PATTERNS["macro"])) {
@@ -378,25 +383,33 @@ export function chatMessage(chatLog, message, chatData) {
 	if (message.match(chatLog.constructor.MESSAGE_PATTERNS["invalid"])) {
 		message = message.replace(/\n/gm, "<br>");
 		let tokenizer = null;
-		message = message.split("<br>").map((line) => {
-			if (line.startsWith("/amacro")) {
+		message = message.split("<br>").map((lineBase) => {
+			if (lineBase.startsWith("/amacro")) {
+				// TODO FIND A BETTER WAY
+				let line = lineBase.replace("/amacro", "/");
 				// Ensure tokenizer, but don't consider dash as a token delimiter
-				if (!tokenizer)
+				if (!tokenizer) {
 					tokenizer = new TokenizeThis({
 						//prettier-ignore
 						shouldTokenize: ["(", ")", ",", "*", "/", "%", "+", "=", "!=", "!", "<", ">", "<=", ">=", "^"],
 					});
+				}
 				let command = null;
 				let args = [];
 				tokenizer.tokenize(line.substr(1), (token) => {
-					if (!command) command = token;
-					else args.push(token);
+					if (!command) {
+						command = token;
+					} else {
+						args.push(token);
+					}
 				});
 				const macro = game.macros.contents.find((macro) => macro.name === command);
 				if (macro) {
 					hasMacros = true;
 					const result = macro.renderContent(...args);
-					if (typeof result !== "string") return "";
+					if (typeof result !== "string") {
+						return "";
+					}
 					return result.trim();
 				}
 			}
@@ -450,39 +463,56 @@ export function chatMessage(chatLog, message, chatData) {
  * @returns
  */
 export function preCreateChatMessage(chatMessage, data, options, userId) {
-	if (data.content === undefined || data.content.length == 0) return;
+	if (data.content === undefined || data.content.length == 0) {
+		return;
+	}
 	let content = data.content || "";
 	let hasMacros = false;
 	if (!chatMessage.isRoll) {
 		if (content.includes("{{")) {
-			const context = FurnaceMacros.getTemplateContext();
+			const context = getTemplateContext();
 			const compiled = Handlebars.compile(content);
-			content = compiled(context, { allowProtoMethodsByDefault: true, allowProtoPropertiesByDefault: true });
+			content = compiled(context, { 
+				allowProtoMethodsByDefault: true, 
+				allowProtoPropertiesByDefault: true 
+			});
 			chatMessage.updateSource({ content: content });
-			if (content.trim().length === 0) return false;
+			if (content.trim().length === 0) {
+				return false;
+			}
 		}
-		if (content.trim().startsWith("<")) return true;
+		if (content.trim().startsWith("<")) {
+			return true;
+		}
 		content = content.replace(/\n/gm, "<br>");
 		let tokenizer = null;
-		content = content.split("<br>").map((line) => {
-			if (line.startsWith("/amacro")) {
+		content = content.split("<br>").map((lineBase) => {
+			if (lineBase.startsWith("/amacro")) {
+				// TODO FIND A BETTER WAY
+				let line = lineBase.replace("/amacro", "/");
 				// Ensure tokenizer, but don't consider dash as a token delimiter
-				if (!tokenizer)
+				if (!tokenizer) {
 					tokenizer = new TokenizeThis({
 						//prettier-ignore
 						shouldTokenize: ["(", ")", ",", "*", "/", "%", "+", "=", "!=", "!", "<", ">", "<=", ">=", "^"],
 					});
+				}
 				let command = null;
 				let args = [];
 				tokenizer.tokenize(line.substr(1), (token) => {
-					if (!command) command = token;
-					else args.push(token);
+					if (!command) {
+						command = token;
+					} else {
+						args.push(token);
+					}
 				});
 				const macro = game.macros.contents.find((macro) => macro.name === command);
 				if (macro) {
 					hasMacros = true;
 					const result = macro.renderContent(...args);
-					if (typeof result !== "string") return "";
+					if (typeof result !== "string") {
+						return "";
+					}
 					return result.trim();
 				}
 			}
@@ -498,9 +528,11 @@ export function preCreateChatMessage(chatMessage, data, options, userId) {
 
 				let [command, match] = ChatLog.parse(data.content);
 				// Special handlers for no command
-				if (command === "invalid")
-					throw new Error(game.i18n.format("CHAT.InvalidCommand", { command: match[1] }));
-				else if (command === "none") command = data.speaker?.token ? "ic" : "ooc";
+				if (command === "invalid") {
+					throw error(game.i18n.format("CHAT.InvalidCommand", { command: match[1] }));
+				} else if (command === "none") {
+					command = data.speaker?.token ? "ic" : "ooc";
+				}
 
 				// Process message data based on the identified command type
 				const createOptions = {};
@@ -508,7 +540,7 @@ export function preCreateChatMessage(chatMessage, data, options, userId) {
 					case "whisper":
 					case "reply":
 					case "gm":
-					case "players":
+					case "players": 
 						ChatLog.prototype._processWhisperCommand(command, match, data, createOptions);
 						break;
 					case "ic":
@@ -563,7 +595,7 @@ export function renderMacroConfig(obj, html, data) {
 						name="flags.advanced-macros.runForEveryone" 
 						data-dtype="Boolean" 
 						${runForEveryone ? "checked" : ""} 
-						${!canRunAsGM ? "disabled" : ""}/>
+						${!canRunAsGMB ? "disabled" : ""}/>
 		        </label>
 		</div>
 		`);

@@ -36,6 +36,7 @@ export const initHooks = async () => {
 
 	Hooks.on("chatMessage", chatMessage);
 	Hooks.on("preCreateChatMessage", preCreateChatMessage);
+	// TODO We really need this ?
 	Macro.prototype.renderContent = renderMacro;
 	// Object.defineProperty(Macro.prototype, "canRunAsGM", { get: this.canRunAsGM });
 
