@@ -224,7 +224,7 @@ export function canRunAsGM(macro) {
 // 	}
 // }
 
-export async function renderMacro(wrapped, ...args) {
+export async function renderMacro(...args) {
 	const macro = this;
 	const context = getTemplateContext(args);
 	if (macro.type === "chat") {
@@ -240,18 +240,11 @@ export async function renderMacro(wrapped, ...args) {
 			return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 		}
 		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro) && !game.user.isGM) {
-			return await advancedMacroSocket.executeMacroAsGM(
-				"executeMacro",
-				macro.id,
-				game.user.id,
-				undefined,
-				context
-			);
+			return await advancedMacroSocket.executeAsGM("executeMacro", macro.id, game.user.id, undefined, context);
 		}
 		// return macro.callScriptFunction(context);
 		return macro._executeScript(context);
 	}
-	return wrapped(...args);
 }
 
 // async executeMacro(...args) {

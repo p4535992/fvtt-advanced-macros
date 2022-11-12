@@ -8,6 +8,7 @@ import {
 	executeMacro,
 	executeScript,
 	preCreateChatMessage,
+	renderMacro,
 	renderMacroConfig,
 	_createContentLink,
 	_onClickContentLink,
@@ -35,7 +36,8 @@ export const initHooks = async () => {
 
 	Hooks.on("chatMessage", chatMessage);
 	Hooks.on("preCreateChatMessage", preCreateChatMessage);
-	// Macro.prototype.renderContent = await renderMacroOLD;
+	Macro.prototype.renderContent = renderMacro;
+	Object.defineProperty(Macro.prototype, "canRunAsGM", { get: this.canRunAsGM });
 
 	// libWrapper.register(
 	// 	"advanced-macros",
