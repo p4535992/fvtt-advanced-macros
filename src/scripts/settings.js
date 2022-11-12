@@ -33,7 +33,10 @@ class ResetSettingsDialog extends FormApplication {
 		//@ts-ignore
 		return new Dialog({
 			title: game.i18n.localize(`${CONSTANTS.MODULE_NAME}.dialogs.resetsettings.title`),
-			content: '<p style="margin-bottom:1rem;">' + game.i18n.localize(`${CONSTANTS.MODULE_NAME}.dialogs.resetsettings.content`) + "</p>",
+			content:
+				'<p style="margin-bottom:1rem;">' +
+				game.i18n.localize(`${CONSTANTS.MODULE_NAME}.dialogs.resetsettings.content`) +
+				"</p>",
 			buttons: {
 				confirm: {
 					icon: '<i class="fas fa-check"></i>',

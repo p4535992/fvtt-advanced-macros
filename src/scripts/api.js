@@ -68,12 +68,15 @@ const API = {
 			return result;
 		} catch (err) {
 			error(err);
-			throw error(game.i18n.format("advanced-macros.MACROS.responses.ExternalMacroSyntaxError", { GM: game.user.name }), true);
+			throw error(
+				game.i18n.format("advanced-macros.MACROS.responses.ExternalMacroSyntaxError", { GM: game.user.name }),
+				true
+			);
 		}
 	},
 
 	executeScript(wrapped, ...args) {
-		const [context] = args;
+		const context = wrapped;
 		// Add variables to the evaluation scope
 		const speaker = ChatMessage.implementation.getSpeaker();
 		const character = game.user.character;
@@ -155,7 +158,9 @@ const API = {
 				delete permissions[user.id];
 			}
 		});
-		return author && author.isGM && Object.values(permissions).every((p) => p < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
+		return (
+			author && author.isGM && Object.values(permissions).every((p) => p < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER)
+		);
 	},
 
 	async renderMacroOLD(...args) {
@@ -173,7 +178,13 @@ const API = {
 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 			}
 			if (this.getFlag("advanced-macros", "runAsGM") && canRunAsGM(this) && !game.user.isGM) {
-				return await advancedMacroSocket.executeMacroAsGM("executeMacro", this.id, game.user.id, undefined, context);
+				return await advancedMacroSocket.executeMacroAsGM(
+					"executeMacro",
+					this.id,
+					game.user.id,
+					undefined,
+					context
+				);
 			}
 			// return this.callScriptFunction(context);
 			return this._executeScript(context);
@@ -195,7 +206,13 @@ const API = {
 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 			}
 			if (this.getFlag("advanced-macros", "runAsGM") && this.canRunAsGM() && !game.user.isGM) {
-				return await advancedMacroSocket.executeMacroAsGM("executeMacro", this.id, game.user.id, undefined, context);
+				return await advancedMacroSocket.executeMacroAsGM(
+					"executeMacro",
+					this.id,
+					game.user.id,
+					undefined,
+					context
+				);
 			}
 			// return this.callScriptFunction(context);
 			return this._executeScript(context);
@@ -290,6 +307,14 @@ const API = {
 	// 	}
 	// },
 
+	/**
+	 * Called when a message is created in the Chat Log.
+	 * Calls ChatMessage.create().
+	 * @param {*} chatLog
+	 * @param {*} message
+	 * @param {*} chatData
+	 * @returns
+	 */
 	chatMessage(chatLog, message, chatData) {
 		let tokenizer = null;
 		let hasMacros = false;
@@ -300,14 +325,18 @@ const API = {
 			if (message.trim().length === 0) return false;
 			message = message;
 		}
-		if (message.trim().startsWith("<")) return true;
+		if (message.trim().startsWith("<") || message.match(chatLog.constructor.MESSAGE_PATTERNS["macro"])) {
+			return true;
+		}
 		if (message.match(chatLog.constructor.MESSAGE_PATTERNS["invalid"])) {
 			message = message.replace(/\n/gm, "<br>");
+			let tokenizer = null;
 			message = message.split("<br>").map((line) => {
 				if (line.startsWith("/")) {
 					// Ensure tokenizer, but don't consider dash as a token delimiter
 					if (!tokenizer)
 						tokenizer = new TokenizeThis({
+							//prettier-ignore
 							shouldTokenize: ["(", ")", ",", "*", "/", "%", "+", "=", "!=", "!", "<", ">", "<=", ">=", "^"],
 						});
 					let command = null;
@@ -365,6 +394,91 @@ const API = {
 		return true;
 	},
 
+	/**
+	 * Called when ChatMessage.create() is called.
+	 * @param {*} chatMessage
+	 * @param {*} data
+	 * @param {*} options
+	 * @param {*} userId
+	 * @returns
+	 */
+	preCreateChatMessage(chatMessage, data, options, userId) {
+		if (data.content === undefined || data.content.length == 0) return;
+		let content = data.content || "";
+		let hasMacros = false;
+		if (!chatMessage.isRoll) {
+			if (content.includes("{{")) {
+				const context = FurnaceMacros.getTemplateContext();
+				const compiled = Handlebars.compile(content);
+				content = compiled(context, { allowProtoMethodsByDefault: true, allowProtoPropertiesByDefault: true });
+				chatMessage.updateSource({ content: content });
+				if (content.trim().length === 0) return false;
+			}
+			if (content.trim().startsWith("<")) return true;
+			content = content.replace(/\n/gm, "<br>");
+			let tokenizer = null;
+			content = content.split("<br>").map((line) => {
+				if (line.startsWith("/")) {
+					// Ensure tokenizer, but don't consider dash as a token delimiter
+					if (!tokenizer)
+						tokenizer = new TokenizeThis({
+							//prettier-ignore
+							shouldTokenize: ["(", ")", ",", "*", "/", "%", "+", "=", "!=", "!", "<", ">", "<=", ">=", "^"],
+						});
+					let command = null;
+					let args = [];
+					tokenizer.tokenize(line.substr(1), (token) => {
+						if (!command) command = token;
+						else args.push(token);
+					});
+					const macro = game.macros.contents.find((macro) => macro.name === command);
+					if (macro) {
+						hasMacros = true;
+						const result = macro.renderContent(...args);
+						if (typeof result !== "string") return "";
+						return result.trim();
+					}
+				}
+				return line.trim();
+			});
+
+			if (hasMacros) {
+				mergeObject(data, { "flags.advanced-macros.macros.template": data.content });
+				// If non-async, then still, recreate it so we can do recursive macro calls
+				data.content = content.join("\n").trim().replace(/\n/gm, "<br>");
+				if (data.content !== undefined && data.content.length > 0) {
+					data.content = data.content.trim();
+
+					let [command, match] = ChatLog.parse(data.content);
+					// Special handlers for no command
+					if (command === "invalid")
+						throw new Error(game.i18n.format("CHAT.InvalidCommand", { command: match[1] }));
+					else if (command === "none") command = data.speaker?.token ? "ic" : "ooc";
+
+					// Process message data based on the identified command type
+					const createOptions = {};
+					switch (command) {
+						case "whisper":
+						case "reply":
+						case "gm":
+						case "players":
+							ChatLog.prototype._processWhisperCommand(command, match, data, createOptions);
+							break;
+						case "ic":
+						case "emote":
+						case "ooc":
+							ChatLog.prototype._processChatCommand(command, match, data, createOptions);
+							break;
+					}
+					ChatMessage.create(data, createOptions);
+				}
+				return false;
+			}
+			data.content = content.join("\n").trim().replace(/\n/gm, "<br>");
+		}
+		return true;
+	},
+
 	renderMacroConfig(obj, html, data) {
 		let form = html.find("form");
 		// A re-render will cause the html object to be the internal element, which is the form itself.
@@ -380,7 +494,9 @@ const API = {
 				<div class="form-group" title="${game.i18n.localize("advanced-macros.MACROS.runAsGMTooltip")}">
 					<label class="form-group">
 						<span>${game.i18n.localize("advanced-macros.MACROS.runAsGM")}</span>
-						<input type="checkbox" name="flags.advanced-macros.runAsGM" data-dtype="Boolean" ${runAsGM ? "checked" : ""} ${!canRunAsGM ? "disabled" : ""}/>
+						<input type="checkbox" name="flags.advanced-macros.runAsGM" data-dtype="Boolean" ${runAsGM ? "checked" : ""} ${
+				!canRunAsGM ? "disabled" : ""
+			}/>
 					</label>
 				</div>
 			`);
@@ -399,6 +515,93 @@ const API = {
 			// `);
 
 			// everyoneDiv.insertAfter(checkbox);
+		}
+	},
+
+	// From Dynamic Macro Links
+	_createContentLink(match, { async = false, relativeTo } = {}) {
+		let [type, target, hash, name] = match.slice(1, 5);
+
+		// Prepare replacement data
+		const data = {
+			cls: ["content-link"],
+			icon: null,
+			dataset: {},
+			name: name,
+		};
+
+		let doc;
+		let broken = false;
+		let args = [];
+		if (type === "UUID") {
+			if (target.split(".")[0] == "Macro" && /\s/g.test(target)) {
+				args = target.split(" ");
+				target = args.shift();
+			}
+			data.dataset = { id: null, uuid: target, args };
+			if (async) doc = fromUuid(target, relativeTo);
+			else {
+				try {
+					doc = fromUuidSync(target, relativeTo);
+				} catch (err) {
+					[type, ...target] = target.split(".");
+					broken = TextEditor._createLegacyContentLink(type, target.join("."), name, data);
+				}
+			}
+		} else broken = TextEditor._createLegacyContentLink(type, target, name, data);
+
+		// Flag a link as broken
+		if (broken) {
+			data.icon = "fas fa-unlink";
+			data.cls.push("broken");
+		}
+
+		const constructAnchor = (doc) => {
+			if (doc) {
+				if (doc.documentName) {
+					const attrs = { draggable: true };
+					if (hash) attrs["data-hash"] = hash;
+					return doc.toAnchor({
+						attrs,
+						dataset: { args: data.dataset.args },
+						classes: data.cls,
+						name: data.name,
+					});
+				}
+				data.name = data.name || doc.name || target;
+				const type = game.packs.get(doc.pack)?.documentName;
+				data.dataset.type = type;
+				data.dataset.id = doc._id;
+				data.dataset.pack = doc.pack;
+				if (hash) data.dataset.hash = hash;
+				data.icon = CONFIG[type].sidebarIcon;
+			} else if (type === "UUID") {
+				// The UUID lookup failed so this is a broken link.
+				data.icon = "fas fa-unlink";
+				data.cls.push("broken");
+			}
+
+			const a = document.createElement("a");
+			a.classList.add(...data.cls);
+			a.draggable = true;
+			for (let [k, v] of Object.entries(data.dataset)) {
+				a.dataset[k] = v;
+			}
+			a.innerHTML = `<i class="${data.icon}"></i>${data.name}`;
+			return a;
+		};
+
+		if (doc instanceof Promise) return doc.then(constructAnchor);
+		return constructAnchor(doc);
+	},
+
+	async _onClickContentLink(event) {
+		event.preventDefault();
+		const doc = await fromUuid(event.currentTarget.dataset.uuid);
+		if (event.currentTarget.dataset.type !== "Macro") return doc?._onClickDocumentLink(event);
+		else {
+			const args = event.currentTarget.dataset.args.split(",") ?? [];
+			return doc?.execute(...args);
 		}
 	},
 };

@@ -24,7 +24,7 @@ export const initHooks = async () => {
 	registerSocket();
 
 	Hooks.on("chatMessage", API.chatMessage);
-
+	Hooks.on("preCreateChatMessage", API.preCreateChatMessage);
 	// Macro.prototype.renderContent = await API.renderMacroOLD;
 
 	// libWrapper.register(
@@ -94,7 +94,7 @@ export const initHooks = async () => {
 		"Macro.prototype.execute",
 		async function (wrapped, ...args) {
 			const macro = this;
-			return await API.executeMacro(macro.id, game.user.id, undefined, undefined);
+			return await API.executeMacro(macro.id, game.user.id, args, macro);
 		},
 		"OVERRIDE"
 	);
@@ -109,12 +109,15 @@ export const initHooks = async () => {
 			"OVERRIDE"
 		);
 	}
+
+	libWrapper.register("advanced-macros", "TextEditor._createContentLink", API._createContentLink, "OVERRIDE");
+	libWrapper.register("advanced-macros", "TextEditor._onClickContentLink", API._onClickContentLink, "OVERRIDE");
 };
 export const setupHooks = () => {
 	setApi(API);
 };
 export const readyHooks = async () => {
-	Hooks.once("renderMacroConfig", (obj, html, data) => {
+	Hooks.on("renderMacroConfig", (obj, html, data) => {
 		API.renderMacroConfig(obj, html, data);
 	});
 };
