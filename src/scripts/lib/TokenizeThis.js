@@ -442,4 +442,5 @@ class TokenizeThis {
  *
  * @type {TokenizeThis}
  */
-module.exports = TokenizeThis;
+// module.exports = TokenizeThis;
+export default TokenizeThis;

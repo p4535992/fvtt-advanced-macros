@@ -34,8 +34,8 @@ const API = {
 		if (!Array.isArray(inAttributes)) {
 			throw error("executeMacroArr | inAttributes must be of type array");
 		}
-		const [macroId, userId, args, context] = inAttributes;
-		return await _executeMacroInternal(macroId, userId, args, context);
+		const [macroId, userId, args, context, callFromSocket] = inAttributes;
+		return await _executeMacroInternal(macroId, userId, args, context, callFromSocket);
 	},
 };
 export default API;

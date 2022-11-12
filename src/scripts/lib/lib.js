@@ -1,4 +1,6 @@
 import CONSTANTS from "../constants.js";
+import { advancedMacroSocket } from "../socket.js";
+import TokenizeThis from "./TokenizeThis.js";
 
 // ================================
 // Logger utility
@@ -65,13 +67,26 @@ export function dialogWarning(message, icon = "fas fa-exclamation-triangle") {
 export async function executeMacro(...args) {
 	const macro = this;
 	const user = game.user;
-	_executeMacroInternal(macro.id, user.id, args, macro);
+	const callFromSocket = args ? args[args.length - 1] : false;
+
+	// DO NOTHING THIS CHECK AVOID SOCKET LOOP , but socketlib should manage ?
+	if (
+		(macro.getFlag("advanced-macros", "runForEveryone") ||
+			macro.getFlag("advanced-macros", "runForSpecificUser")) &&
+		!callFromSocket
+	) {
+		await _executeMacroInternal(macro.id, user.id, args, macro, false);
+	}
 }
 
-export async function _executeMacroInternal(macroId, userId, args, context) {
+export async function _executeMacroInternal(macroId, userId, args, context, callFromSocket) {
 	//const macro = this;
 	const macro = game.macros.get(macroId);
 	const user = game.users.get(userId);
+
+	if (callFromSocket) {
+		context = getTemplateContext(args, context);
+	}
 
 	if (!macro) {
 		throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoMacro"), true);
@@ -95,6 +110,7 @@ export async function _executeMacroInternal(macroId, userId, args, context) {
 	// Chat macros
 	if (macro.type === "chat") {
 		try {
+			args.push(callFromSocket);
 			const content = macro.renderContent(...args);
 			ui.chat.processMessage(content).catch((err) => {
 				ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.SyntaxError"), {
@@ -113,6 +129,7 @@ export async function _executeMacroInternal(macroId, userId, args, context) {
 	// Script macros
 	else if (macro.type === "script") {
 		try {
+			args.push(callFromSocket);
 			return await macro.renderContent(...args);
 		} catch (err) {
 			ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError"), {
@@ -192,7 +209,9 @@ export function getTemplateContext(args = null, remoteContext = null) {
 				if (tokenData) context.token = new Token(tokenData, context.scene);
 			}
 		}
-		if (remoteContext.characterId) context.character = game.actors.get(remoteContext.characterId) || null;
+		if (remoteContext.characterId) {
+			context.character = game.actors.get(remoteContext.characterId) || null;
+		}
 	} else {
 		context.speaker = ChatMessage.getSpeaker();
 		if (args && Object.prototype.toString.call(args[0]) === "[object Object") {
@@ -236,15 +255,52 @@ export async function renderMacro(...args) {
 			return macro.command;
 		}
 	}
+
+	const callFromSocket = args ? args[args.length - 1] : false;
+
+	const contextForSocket = {
+		speaker: context.speaker,
+		characterId: context.character.id,
+		actorId: context.actor.id,
+		tokenId: context.token.id,
+	};
+
 	if (macro.type === "script") {
 		if (!game.user.can("MACRO_SCRIPT")) {
 			return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 		}
-		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro)) {
-			return await advancedMacroSocket.executeAsGM("executeMacro", macro.id, game.user.id, undefined, context);
+		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro) && !callFromSocket) {
+			return await advancedMacroSocket.executeAsGM(
+				"executeMacro",
+				macro.id,
+				game.user.id,
+				args,
+				contextForSocket,
+				true
+			);
+		} else if (macro.getFlag("advanced-macros", "runForEveryone") && canRunAsGM(macro) && !callFromSocket) {
+			return await advancedMacroSocket.executeForOthers(
+				"executeMacro",
+				macro.id,
+				game.user.id,
+				args,
+				contextForSocket,
+				true
+			);
+		} else if (macro.getFlag("advanced-macros", "runForSpecificUser") && canRunAsGM(macro) && !callFromSocket) {
+			return await advancedMacroSocket.executeForUsers(
+				"executeMacro",
+				[macro.getFlag("advanced-macros", "runForSpecificUser")],
+				macro.id,
+				game.user.id,
+				args,
+				contextForSocket,
+				true
+			);
+		} else {
+			// return macro.callScriptFunction(context);
+			return macro._executeScript(context);
 		}
-		// return macro.callScriptFunction(context);
-		return macro._executeScript(context);
 	}
 }
 
@@ -323,7 +379,7 @@ export function chatMessage(chatLog, message, chatData) {
 		message = message.replace(/\n/gm, "<br>");
 		let tokenizer = null;
 		message = message.split("<br>").map((line) => {
-			if (line.startsWith("/")) {
+			if (line.startsWith("/amacro")) {
 				// Ensure tokenizer, but don't consider dash as a token delimiter
 				if (!tokenizer)
 					tokenizer = new TokenizeThis({
@@ -409,7 +465,7 @@ export function preCreateChatMessage(chatMessage, data, options, userId) {
 		content = content.replace(/\n/gm, "<br>");
 		let tokenizer = null;
 		content = content.split("<br>").map((line) => {
-			if (line.startsWith("/")) {
+			if (line.startsWith("/amacro")) {
 				// Ensure tokenizer, but don't consider dash as a token delimiter
 				if (!tokenizer)
 					tokenizer = new TokenizeThis({
@@ -486,9 +542,11 @@ export function renderMacroConfig(obj, html, data) {
 			<div class="form-group" title="${game.i18n.localize("advanced-macros.MACROS.runAsGMTooltip")}">
 				<label class="form-group">
 					<span>${game.i18n.localize("advanced-macros.MACROS.runAsGM")}</span>
-					<input type="checkbox" name="flags.advanced-macros.runAsGM" data-dtype="Boolean" ${runAsGM ? "checked" : ""} ${
-			!canRunAsGMB ? "disabled" : ""
-		}/>
+					<input type="checkbox" 
+						name="flags.advanced-macros.runAsGM" 
+						data-dtype="Boolean" 
+						${runAsGM ? "checked" : ""} 
+						${!canRunAsGMB ? "disabled" : ""}/>
 				</label>
 			</div>
 		`);
@@ -496,17 +554,44 @@ export function renderMacroConfig(obj, html, data) {
 
 		// Execute for all other clients (ty to socketlib)
 
-		// const runForEveryone = app.object.getFlag("advanced-macros", "runForEveryone");
-		// const everyoneDiv = $(`
-		// <div class="form-group" title="${game.i18n.localize("advanced-macros.MACROS.runForEveryoneTooltip")}">
-		//         <label class="form-group">
-		//             <span>${game.i18n.localize("advanced-macros.MACROS.runForEveryone")}</span>
-		//             <input type="checkbox" name="flags.advanced-macros.runForEveryone" data-dtype="Boolean" ${runForEveryone ? "checked" : ""} ${!canRunAsGM ? "disabled" : ""}>
-		//         </label>
-		// </div>
-		// `);
+		const runForEveryone = macro.getFlag("advanced-macros", "runForEveryone");
+		const everyoneDiv = $(`
+		<div class="form-group" title="${game.i18n.localize("advanced-macros.MACROS.runForEveryoneTooltip")}">
+		        <label class="form-group">
+		            <span>${game.i18n.localize("advanced-macros.MACROS.runForEveryone")}</span>
+		            <input type="checkbox" 
+						name="flags.advanced-macros.runForEveryone" 
+						data-dtype="Boolean" 
+						${runForEveryone ? "checked" : ""} 
+						${!canRunAsGM ? "disabled" : ""}/>
+		        </label>
+		</div>
+		`);
 
-		// everyoneDiv.insertAfter(checkbox);
+		everyoneDiv.insertAfter(gmDiv);
+
+		// Exceute only for specific one
+		const runForSpecificUser = macro.getFlag("advanced-macros", "runForSpecificUser");
+		const options = [];
+		options.push(`<option value="">${i18n("advanced-macros.MACROS.None")}</option>`);
+		for (const user of game.users) {
+			if (runForSpecificUser == user.id) {
+				options.push(`<option selected="selected" value="${user.id}">${user.name}</option>`);
+			} else {
+				options.push(`<option value="${user.id}">${user.name}</option>`);
+			}
+		}
+
+		const specificOneDiv = $(`
+			<div class="form-group" title="${game.i18n.localize("advanced-macros.MACROS.runForSpecificUserTooltip")}">
+				<label>${game.i18n.localize("advanced-macros.MACROS.runForSpecificUser")}</label>
+				<select name="flags.advanced-macros.runForSpecificUser">
+					${options.join("")}
+				</select>
+			</div>
+		`);
+
+		specificOneDiv.insertAfter(everyoneDiv);
 	}
 }
 
