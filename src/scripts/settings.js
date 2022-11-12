@@ -8,7 +8,14 @@ export const registerSettings = function () {
 		restricted: true,
 	});
 	// =====================================================================
-
+	game.settings.register(CONSTANTS.MODULE_NAME, "disableDropHotbarRollTableBehavior", {
+		name: `${CONSTANTS.MODULE_NAME}.setting.disableDropHotbarRollTableBehavior.name`,
+		hint: `${CONSTANTS.MODULE_NAME}.setting.disableDropHotbarRollTableBehavior.hint`,
+		scope: "client",
+		config: true,
+		default: false,
+		type: Boolean,
+	});
 	// ========================================================================
 	game.settings.register(CONSTANTS.MODULE_NAME, "debug", {
 		name: `${CONSTANTS.MODULE_NAME}.setting.debug.name`,
@@ -76,6 +83,14 @@ function defaultSettings(apply = false) {
 }
 function otherSettings(apply = false) {
 	return {
+		disableDropHotbarRollTableBehavior: {
+			name: `${CONSTANTS.MODULE_NAME}.setting.disableDropHotbarRollTableBehavior.name`,
+			hint: `${CONSTANTS.MODULE_NAME}.setting.disableDropHotbarRollTableBehavior.hint`,
+			scope: "client",
+			config: true,
+			default: false,
+			type: Boolean,
+		},
 		debug: {
 			name: `${CONSTANTS.MODULE_NAME}.setting.debug.name`,
 			hint: `${CONSTANTS.MODULE_NAME}.setting.debug.hint`,

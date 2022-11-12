@@ -92,18 +92,48 @@ export async function _executeMacroInternal(macroId, userId, args, context) {
 		throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"), true);
 	}
 
-	const contextFinal = getTemplateContext(args, context);
-	try {
-		// const result = macro.callScriptFunction(context);
-		const result = macro._executeScript(contextFinal);
-		return result;
-	} catch (err) {
-		error(err);
-		throw error(
-			game.i18n.format("advanced-macros.MACROS.responses.ExternalMacroSyntaxError", { GM: game.user.name }),
-			true
-		);
+	// Chat macros
+	if (macro.type === "chat") {
+		try {
+			const content = macro.renderContent(...args);
+			ui.chat.processMessage(content).catch((err) => {
+				ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.SyntaxError"), {
+					console: false,
+				});
+				error(err);
+			});
+		} catch (err) {
+			ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError"), {
+				console: false,
+			});
+			error(err);
+		}
 	}
+
+	// Script macros
+	else if (macro.type === "script") {
+		try {
+			return await macro.renderContent(...args);
+		} catch (err) {
+			ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError"), {
+				console: false,
+			});
+			error(err);
+		}
+	}
+
+	// const contextFinal = getTemplateContext(args, context);
+	// try {
+	// 	// const result = macro.callScriptFunction(context);
+	// 	const result = macro._executeScript(contextFinal);
+	// 	return result;
+	// } catch (err) {
+	// 	error(err);
+	// 	throw error(
+	// 		game.i18n.format("advanced-macros.MACROS.responses.ExternalMacroSyntaxError", { GM: game.user.name }),
+	// 		true
+	// 	);
+	// }
 }
 
 export function executeScript(wrapped, ...args) {
@@ -195,35 +225,6 @@ export function canRunAsGM(macro) {
 	return author && author.isGM && Object.values(permissions).every((p) => p < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
 }
 
-// export async function renderMacroOLD(...args) {
-// 	const context = getTemplateContext(args);
-// 	const macro = this;
-// 	if (macro.type === "chat") {
-// 		if (macro.command.includes("{{")) {
-// 			const compiled = Handlebars.compile(macro.command);
-// 			return compiled(context, { allowProtoMethodsByDefault: true, allowProtoPropertiesByDefault: true });
-// 		} else {
-// 			return macro.command;
-// 		}
-// 	}
-// 	if (macro.type === "script") {
-// 		if (!game.user.can("MACRO_SCRIPT")) {
-// 			return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
-// 		}
-// 		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro) && !game.user.isGM) {
-// 			return await advancedMacroSocket.executeMacroAsGM(
-// 				"executeMacro",
-// 				macro.id,
-// 				game.user.id,
-// 				undefined,
-// 				context
-// 			);
-// 		}
-// 		// return macro.callScriptFunction(context);
-// 		return macro._executeScript(context);
-// 	}
-// }
-
 export async function renderMacro(...args) {
 	const macro = this;
 	const context = getTemplateContext(args);
@@ -239,7 +240,7 @@ export async function renderMacro(...args) {
 		if (!game.user.can("MACRO_SCRIPT")) {
 			return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 		}
-		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro) && !game.user.isGM) {
+		if (macro.getFlag("advanced-macros", "runAsGM") && canRunAsGM(macro)) {
 			return await advancedMacroSocket.executeAsGM("executeMacro", macro.id, game.user.id, undefined, context);
 		}
 		// return macro.callScriptFunction(context);
@@ -247,92 +248,55 @@ export async function renderMacro(...args) {
 	}
 }
 
-// async executeMacro(...args) {
-//     const [macroId, userId, context] = args;
+// Commented now we use socketLib mich more simple to read and manage ...
 
-//     const macro = game.macros.get(macroId);
-//     const user = game.users.get(userId);
-
-//     // const sendResponse = (error = null, result = null) =>
-//     //     game.socket.emit("module.advanced-macros", {
-//     //         action: "GMMacroResult",
-//     //         requestId: message.requestId,
-//     //         error,
-//     //     });
-
-//     if (!macro) {
-//         // return sendResponse(game.i18n.localize("advanced-macros.MACROS.responses.NoMacro"));
-//         // return {
-//         //     action: "GMMacroResult",
-//         //     requestId: message.requestId,
-//         //     error: game.i18n.localize("advanced-macros.MACROS.responses.NoMacro"),
-//         // };
-//         throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoMacro"), true)
-//     }
-//     if (!user) {
-//         // return sendResponse(game.i18n.localize("advanced-macros.MACROS.responses.NoUser"));
-//         // return {
-//         //     action: "GMMacroResult",
-//         //     requestId: message.requestId,
-//         //     error: game.i18n.localize("advanced-macros.MACROS.responses.NoUser"),
-//         // };
-//         throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoUser"), true);
-//     }
-//     if (macro.type !== "script") {
-//         // return sendResponse(game.i18n.localize("advanced-macros.MACROS.responses.NotScript"));
-//         // return {
-//         //     action: "GMMacroResult",
-//         //     requestId: message.requestId,
-//         //     error: game.i18n.localize("advanced-macros.MACROS.responses.NotScript"),
-//         // };
-//         throw error(game.i18n.localize("advanced-macros.MACROS.responses.NotScript"), true);
-//     }
-//     if (!user.can("MACRO_SCRIPT")) {
-//         // return sendResponse(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
-//         // return {
-//         //     action: "GMMacroResult",
-//         //     requestId: message.requestId,
-//         //     error: game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"),
-//         // };
-//         throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"), true);
-//     }
-//     if (!macro.getFlag("advanced-macros", "runAsGM") || !macro.canRunAsGM) {
-//         // return sendResponse(game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"));
-//         // return {
-//         //     action: "GMMacroResult",
-//         //     requestId: message.requestId,
-//         //     error: game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"),
-//         // };
-//         throw error(game.i18n.localize("advanced-macros.MACROS.responses.NoRunAsGM"), true);
-//     }
-
-//     // Chat macros
-// 	if (macro.type === "chat") {
-// 		try {
-// 			const content = macro.renderContent(...args);
-// 			ui.chat.processMessage(content).catch((err) => {
-// 				// ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.SyntaxError"), { console: false });
-// 				// console.error("Advanced Macros |", err);
-//                 error(game.i18n.localize("advanced-macros.MACROS.responses.SyntaxError") + " : " + err, true);
-// 			});
-// 		} catch (err) {
-// 			// ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError"), { console: false });
-// 			// console.error("Advanced Macros |", err);
-//             error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError") + " : " + err, true);
-// 		}
+// // request execution of macro as a GM
+// async executeMacroAsGM(macro, context) {
+// 	const activeGMs = game.users.contents.filter((u) => u.isGM && u.active);
+// 	if (activeGMs.length === 0) {
+// 		ui.notifications.error(game.i18n.format("FURNACE.MACROS.responses.NoConnectedGM", { macro: macro.name }));
+// 		return "";
 // 	}
-
-// 	// Script macros
-// 	else if (macro.type === "script") {
-// 		try {
-// 			return await macro.renderContent(...args);
-// 		} catch (err) {
-// 			// ui.notifications.error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError"), { console: false });
-// 			// console.error("Advanced Macros |", err);
-//             error(game.i18n.localize("advanced-macros.MACROS.responses.MacroSyntaxError") + " : " + err, true);
-// 		}
-// 	}
-// },
+// 	// Elect a GM to run the Macro
+// 	const electionResponse = await new Promise((resolve, reject) => {
+// 		const requestId = this.uniqueID();
+// 		this._requestResolvers[requestId] = resolve;
+// 		game.socket.emit("module.advanced-macros", {
+// 			action: "ElectGMExecutor",
+// 			requestId,
+// 		});
+// 		setTimeout(() => {
+// 			delete this._requestResolvers[requestId];
+// 			reject(new Error(game.i18n.localize("FURNACE.MACROS.responses.TimeoutGM")));
+// 		}, 5000);
+// 	});
+// 	// Execute the macro in the first elected GM's
+// 	const executeResponse = await new Promise((resolve, reject) => {
+// 		const requestId = this.uniqueID();
+// 		this._requestResolvers[requestId] = resolve;
+// 		game.socket.emit("module.advanced-macros", {
+// 			action: "GMExecuteMacro",
+// 			requestId,
+// 			electionId: electionResponse,
+// 			userId: game.user.id,
+// 			macroId: macro.id,
+// 			args: context.args,
+// 			context: {
+// 				speaker: context.speaker,
+// 				actorId: context.actor ? context.actor.id : null,
+// 				sceneId: context.scene ? context.scene.id : null,
+// 				tokenId: context.token ? context.token.id : null,
+// 				characterId: context.character ? context.character.id : null,
+// 			},
+// 		});
+// 		setTimeout(() => {
+// 			delete this._requestResolvers[requestId];
+// 			reject(new Error(game.i18n.localize("FURNACE.MACROS.responses.TimeoutWaitGM")));
+// 		}, 5000);
+// 	});
+// 	if (executeResponse.error) throw new Error(executeResponse.error);
+// 	else return executeResponse.result;
+// }
 
 /**
  * Called when a message is created in the Chat Log.
