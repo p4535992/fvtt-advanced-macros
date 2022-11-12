@@ -2,6 +2,16 @@ import { setApi } from "../main.js";
 import API from "./api.js";
 import CONSTANTS from "./constants.js";
 import { advancedMacroSocket, registerSocket } from "./socket.js";
+import {
+	canRunAsGM,
+	chatMessage,
+	executeMacro,
+	executeScript,
+	preCreateChatMessage,
+	renderMacroConfig,
+	_createContentLink,
+	_onClickContentLink,
+} from "./lib/lib.js";
 
 export const initHooks = async () => {
 	let helpers = {
@@ -23,15 +33,15 @@ export const initHooks = async () => {
 	Hooks.once("socketlib.ready", registerSocket);
 	registerSocket();
 
-	Hooks.on("chatMessage", API.chatMessage);
-	Hooks.on("preCreateChatMessage", API.preCreateChatMessage);
-	// Macro.prototype.renderContent = await API.renderMacroOLD;
+	Hooks.on("chatMessage", chatMessage);
+	Hooks.on("preCreateChatMessage", preCreateChatMessage);
+	// Macro.prototype.renderContent = await renderMacroOLD;
 
 	// libWrapper.register(
 	// 	"advanced-macros",
 	// 	"Macro.prototype.renderContent",
 	// 	async function (wrapped, ...args) {
-	// 		const context = API.getTemplateContext(args);
+	// 		const context = getTemplateContext(args);
 	// 		if (this.type === "chat") {
 	// 			if (this.command.includes("{{")) {
 	// 				const compiled = Handlebars.compile(this.command);
@@ -47,12 +57,12 @@ export const initHooks = async () => {
 	// 			if (!game.user.can("MACRO_SCRIPT")) {
 	// 				return ui.notifications.warn(game.i18n.localize("advanced-macros.MACROS.responses.NoMacroPermission"));
 	// 			}
-	// 			if (this.getFlag("advanced-macros", "runAsGM") && API.canRunAsGM(this) && !game.user.isGM) {
+	// 			if (this.getFlag("advanced-macros", "runAsGM") && canRunAsGM(this) && !game.user.isGM) {
 	// 				if (this.getFlag("advanced-macros", "runForEveryone")) {
 	// 					return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
 	// 				}
 	// 				return await advancedMacroSocket.executeAsGM(this, context);
-	// 			} else if (this.getFlag("advanced-macros", "runForEveryone") && API.canRunAsGM(this) && !game.user.isGM) {
+	// 			} else if (this.getFlag("advanced-macros", "runForEveryone") && canRunAsGM(this) && !game.user.isGM) {
 	// 				return await advancedMacroSocket.executeForEveryone("executeMacro", this.id, game.user.id, undefined, context);
 	// 			}
 	// 			// return this.callScriptFunction(context);
@@ -70,7 +80,7 @@ export const initHooks = async () => {
 				return false;
 			}
 			if (this.type === "script") {
-				if (this.getFlag("advanced-macros", "runAsGM") && API.canRunAsGM(this) && !game.user.isGM) {
+				if (this.getFlag("advanced-macros", "runAsGM") && canRunAsGM(this) && !game.user.isGM) {
 					return true;
 				}
 				return game.user.can("MACRO_SCRIPT");
@@ -80,45 +90,28 @@ export const initHooks = async () => {
 		"OVERRIDE"
 	);
 
-	libWrapper.register(
-		"advanced-macros",
-		"Macro.prototype._executeScript",
-		function (wrapped, ...args) {
-			return API.executeScript(wrapped, ...args);
-		},
-		"OVERRIDE"
-	);
+	libWrapper.register("advanced-macros", "Macro.prototype._executeScript", executeScript, "OVERRIDE");
 
-	libWrapper.register(
-		"advanced-macros",
-		"Macro.prototype.execute",
-		async function (wrapped, ...args) {
-			const macro = this;
-			return await API.executeMacro(macro.id, game.user.id, args, macro);
-		},
-		"OVERRIDE"
-	);
+	libWrapper.register("advanced-macros", "Macro.prototype.execute", executeMacro, "OVERRIDE");
 
 	if (game.system.id === "pf2e") {
 		libWrapper.register(
 			"advanced-macros",
 			"CONFIG.Macro.documentClass.prototype._executeScript",
-			function (wrapped, ...args) {
-				return API.executeScript(wrapped, ...args);
-			},
+			executeScript,
 			"OVERRIDE"
 		);
 	}
 
-	libWrapper.register("advanced-macros", "TextEditor._createContentLink", API._createContentLink, "OVERRIDE");
-	libWrapper.register("advanced-macros", "TextEditor._onClickContentLink", API._onClickContentLink, "OVERRIDE");
+	libWrapper.register("advanced-macros", "TextEditor._createContentLink", _createContentLink, "OVERRIDE");
+	libWrapper.register("advanced-macros", "TextEditor._onClickContentLink", _onClickContentLink, "OVERRIDE");
 };
 export const setupHooks = () => {
 	setApi(API);
 };
 export const readyHooks = async () => {
 	Hooks.on("renderMacroConfig", (obj, html, data) => {
-		API.renderMacroConfig(obj, html, data);
+		renderMacroConfig(obj, html, data);
 	});
 };
 // ==========================================
